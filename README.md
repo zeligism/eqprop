@@ -1,2 +1,2 @@
-# eqprop
-Equilibrium Propagation
+# Equilibrium Propagation
+Work in-progress...
