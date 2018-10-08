@@ -1,0 +1,2 @@
+# eqprop
+Equilibrium Propagation
