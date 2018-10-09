@@ -194,7 +194,7 @@ def train(net, trainloader):
 
         # Train on (x,y) using equilibrium propagation
         cost = net.eqprop(x, y_onehot)
-        print("cost =", cost)
+        print(i, "cost =", cost)
 
 
 def test(net, testloader):
@@ -207,7 +207,7 @@ def test(net, testloader):
 
         # Train on (x,y) using equilibrium propagation
         cost = net.eqprop(x, y_onehot, validation=True)
-        print("cost =", cost)
+        print(i, "cost =", cost)
 
         # Calculate hits
         _, index = net.output_state().max(dim=-1)
