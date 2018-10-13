@@ -1,4 +1,5 @@
 
+import pickle
 import torch
 
 from training_configs import *
@@ -15,16 +16,11 @@ class EqPropNet:
         self.beta = beta
         self.rho = rho
 
-        # Lists storing the weights, biases, and neuron-states of the network
-        self.W = [
-            torch.randn([BATCH_SIZE, l1, l2])
+        # Lists storing the weights, biases, and neuron-states of each layer
+        self.W = [torch.randn(l1, l2) * torch.tensor(2 / (l1 + l2)).sqrt()
             for l1, l2 in zip(layers_sizes[:-1], layers_sizes[1:])]
-        self.biases = [
-            torch.zeros([BATCH_SIZE, l])
-            for l in layers_sizes[:-1]]
-        self.states = [
-            torch.zeros([BATCH_SIZE, l], requires_grad=True)
-            for l in layers_sizes]
+        self.biases = [torch.zeros(l) for l in layers_sizes[1:]]
+        self.states = [torch.zeros(BATCH_SIZE, l) for l in layers_sizes]
 
     
     def energy(self, states):
@@ -32,83 +28,75 @@ class EqPropNet:
         Calculates the energy of the network.
         """
         rho = self.rho
-
         energy = 0
 
         for i in range(len(states)):
             # Sum of s_i * s_i for all i
             energy += 0.5 * torch.sum(states[i] * states[i], dim=-1)
 
-        for i in range(len(states) - 1):
+        for i in range(len(self.W)):
             # Sum of W_ij * rho(s_i) * rho(s_j) for all i, j
-            wi_times_si = rho(states[i]).unsqueeze(dim=-2) @ self.W[i]
-            energy -= torch.sum(wi_times_si.squeeze() * rho(states[i+1]), dim=-1)
+            energy -= torch.sum(
+                (rho(states[i]) @ self.W[i]) * rho(states[i+1]), dim=-1)
             # Sum of bias_i * rho(s_i)
-            energy -= torch.sum(self.biases[i] * rho(states[i]), dim=-1)
+            energy -= torch.sum(self.biases[i] * rho(states[i+1]), dim=-1)
 
-        return energy.mean()
+        return energy
 
 
-    def cost(self, y):
+    def cost(self, states, y):
         """
         Calculates the cost between the state of the last layer of the network
         with the output y. The cost is just the distance (L2 loss).
         """
-        cost = torch.sum((self.output_state() - y) ** 2, dim=-1)
+        output_layer = self.output_state(states)
+        cost = torch.sum((output_layer - y) ** 2, dim=-1)
         
-        return cost.mean()
+        return cost
+
+
+    def output_state(self, states=None):
+        """
+        Returns the output state layer from states.
+        In our case, it is simply the last layer in `states`.
+        """
+        return self.states[-1] if states is None else states[-1]
 
 
     def clamp_input(self, x):
         """
         The following function simply clamps an input to the network.
+        The input x should always be clamped to the first layer because
+        our training procedure assumes that `self.states[0] == x`.
         """
         self.states[0] = x
 
 
-    def output_state(self):
+    def step(self, states, y=None, dt=DELTA):
         """
-        Just returns the output of the network (last layer).
-        """
-        return self.states[-1]
-
-
-    def zero_grad(self):
-        """
-        Zero out gradients of all parameters of the network.
-        """
-        [w.grad.data.zero_() for w in self.W      if w.grad is not None]
-        [b.grad.data.zero_() for b in self.biases if b.grad is not None]
-        [s.grad.data.zero_() for s in self.states if s.grad is not None]
-
-
-    def step(self, y=None, dt=DELTA):
-        """
-        Make one step of duration dt.
+        Make one step of duration dt. TODO
         """
 
-        # First zero the gradients
-        self.zero_grad()
+        [s.requires_grad_() for s in states[1:]]
 
         # Calculate the total energy with the cost if y is given
-        energy = self.energy(self.states)
+        energy = self.energy(states)
         if y is not None:
-            energy += self.beta * self.cost(y)
+            energy += self.beta * self.cost(states, y)
 
         # Calculate the gradients
-        energy.backward()
+        energy.sum().backward()
 
         # Update states
-        for i in range(1, len(self.states)):
+        for i in range(1, len(states)):
             # Notice the negative sign because ds/dt = -dE/ds (partial d)
-            self.states[i] = self.states[i] - dt * self.states[i].grad
-            # We re-attach the states after updating them to reset gradient path
-            self.states[i] = self.states[i].clamp(0,1).detach().requires_grad_()
+            states[i] = states[i] - dt * states[i].grad
+            states[i].clamp_(0,1).detach_()
 
         return energy
 
 
-    def eqprop(self, x, y, validation=False):
+    def eqprop(self, x, y, train=True):
         """
         Trains the network on one example (x,y) using equilibrium propagation.
         """
@@ -118,50 +106,66 @@ class EqPropNet:
 
         # Run free phase
         for i in range(N_ITER_1):
-            energy = self.step()
+            energy = self.step(self.states)
 
-        if validation:
-            return energy.item(), self.cost(y).item()
+        if train:
+            # Collect states and perturb them to the weakly clamped y
+            clamped_states = [torch.tensor(s) for s in self.states]
+            for i in range(N_ITER_2):
+                energy = self.step(clamped_states, y)
 
-        # Collect states
-        free_states = [s.data for s in self.states]
+            # Update weights
+            self.update_weights(self.states, clamped_states)
 
-        # Run weakly clamped phase
-        for i in range(N_ITER_2):
-            energy = self.step(y)
-
-        #print("Updating weights...")
-        self.update_weights(free_states)
-
-        return energy.item(), self.cost(y).item()
+        return energy, self.cost(self.states, y)
     
 
-    def update_weights(self, free_states, dt=DELTA):
+    def update_weights(self, free_states, clamped_states, dt=DELTA):
         """
-        TODO
+        TODO: doc
         """
         lr = self.learning_rates
 
         [w.requires_grad_() for w in self.W]
         [b.requires_grad_() for b in self.biases]
 
-        self.zero_grad()
-        free_energy = self.energy(free_states)
-        clamped_energy = self.energy(self.states)
-        energy = 1 / self.beta * (clamped_energy - free_energy)
+        free_energy = self.energy(free_states).mean()
+        clamped_energy = self.energy(clamped_states).mean()
+        rand_sign = -1 if torch.randn(1) > 0 else 1
+        rand_sign = 1  #XXX
+        energy = rand_sign / self.beta * (clamped_energy - free_energy)
         energy.backward()
 
         # Update weights and biases (note the negative sign)
         for i in range(len(self.W)):
             self.W[i] = self.W[i] - lr[i] * self.W[i].grad
-            self.W[i] = self.W[i].detach().requires_grad_()
+            self.W[i].detach_()
 
         for i in range(len(self.biases)):
             self.biases[i] = self.biases[i] - lr[i] * self.biases[i].grad
-            self.biases[i] = self.biases[i].detach().requires_grad_()
+            self.biases[i].detach_()
 
-        [w.detach_() for w in self.W]
-        [b.detach_() for b in self.biases]
+
+    def save_parameters(self, fname=FNAME):
+        """
+        Saves the weights and biases of the model to a file called `fname`.
+        """
+        with open(fname, "wb") as f:
+            print("Saving parameters to '%s'... " % fname, end="")
+            parameters = (self.W, self.biases)
+            pickle.dump(parameters, f)
+            print("Done.")
+
+
+    def load_parameters(self, fname=FNAME):
+        """
+        Loads the weights and biases from a file called `fname`.
+        """
+        with open(fname, "wb") as f:
+            print("Loading parameters from '%s'... " % fname, end="")
+            parameters = pickle.load(f)
+            self.W, self.biases = parameters  # XXX
+            print("Done.")
 
 
 
