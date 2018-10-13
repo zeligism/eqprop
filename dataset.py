@@ -8,7 +8,7 @@ def dataset(batch_size):
     ### Prepare training and test sets ###
     transform = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        #transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         ])
 
     trainset = torchvision.datasets.MNIST(
@@ -21,12 +21,6 @@ def dataset(batch_size):
         testset, batch_size=batch_size, shuffle=False, num_workers=2)
 
     return trainloader, testloader
-
-
-def imshow(img):
-    img = img / 2 + 0.5     # unnormalize
-    npimg = img.numpy()
-    plt.imshow(np.transpose(npimg, (1, 2, 0)))
 
 
 
