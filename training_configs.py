@@ -9,7 +9,8 @@ BATCH_SIZE = 20
 CHECKPOINT = 20
 
 # EqProp specific hyperparameters
-BETA = 1
+FNAME = "model.pickled"
+BETA = 1.0
 DELTA = 0.5  # called epsilon in the paper
 RHO = lambda x: x.clamp(0, 1)
 
@@ -19,8 +20,9 @@ CONFIGURATION = 1
 
 ### Configuration 1 ###
 if CONFIGURATION == 1:
+	BETA = 0.5
 	#EPOCHS = 25
-	EPOCHS = 5
+	EPOCHS = 15
 	N_ITER_1 = 20
 	N_ITER_2 = 4
 	LAYER_SIZES = [
