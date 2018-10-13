@@ -1,5 +1,6 @@
 
 import time
+from matplotlib.pyplot import imshow
 import torch
 
 from training_configs import *
@@ -14,10 +15,16 @@ def index_to_onehot(index, num_indices):
     return onehot
 
 
+def count_hits(net, y):
+    _, index = net.output_state().max(dim=-1)
+    hits = (y == index).sum().item()
+
+    return hits
+
+
 def train(net, trainloader):
     start_time = time.time()
     for epoch in range(EPOCHS):
-        return
         running_energy = running_cost = 0.0
         for i, data in enumerate(trainloader):
             x, y = data
@@ -29,16 +36,23 @@ def train(net, trainloader):
             # Train on (x,y) using equilibrium propagation
             energy, cost = net.eqprop(x, y_onehot)
 
-            running_energy += energy
-            running_cost += cost
+            # Perpare stuff for checkpoint reports
+            running_energy += energy.mean()
+            running_cost += cost.mean()
             if (i + 1) % CHECKPOINT == 0:
+                avg_energy = running_energy / CHECKPOINT
                 avg_cost = running_cost / CHECKPOINT
-                print("[%d, %d] energy = %.3f, cost = %.3f" % (epoch+1, i+1,
-                    running_energy / CHECKPOINT, running_cost / CHECKPOINT))
+                print("[%d, %d] energy = %.3f, cost = %.3f, hits = %d/%d" % (
+                    epoch+1, i+1, avg_energy, avg_cost,
+                    count_hits(net, y), y.size()[0]))
                 print("Time elapsed = %ds" % (time.time() - start_time))
                 running_energy = running_cost = 0.0
 
-    print("\nEPOCH: [%d/%d] energy = %.3f, cost = %.3f\n" % (epoch+1, EPOCHS, energy, cost))
+        print("\nEPOCH: [%d/%d] energy = %.3f, cost = %.3f\n, hits = %d/%d" % (
+            epoch+1, EPOCHS, energy.mean(), cost.mean(), count_hits(net, y), y.size()[0]))
+
+    # Save model
+    net.save_parameters()
             
 
 def test(net, testloader):
@@ -51,19 +65,18 @@ def test(net, testloader):
         y_onehot = index_to_onehot(y, LAYER_SIZES[-1])
 
         # Train on (x,y) using equilibrium propagation
-        energy, cost = net.eqprop(x, y_onehot, validation=True)
-        print("[%d] energy = %.3f, cost = %.3f" % (i, energy, cost))
+        energy, cost = net.eqprop(x, y_onehot, train=False)
+        print("[%d] energy = %.3f, cost = %.3f" % (i, energy.mean(), cost.mean()))
 
         # Calculate hits
-        _, index = net.output_state().max(dim=-1)
-        hits = (y == index).sum().item()
-        print("hits =", hits, "out of", BATCH_SIZE)
+        hits = count_hits(net, y)
+        print("hits =", hits, "out of", y.size()[0])
 
         running_hits += hits
         iterations += 1
 
     print("\nAverage hits =", running_hits / iterations)
-    print("Error =", 100 * (1 - running_hits / (iterations * BATCH_SIZE)))
+    print("Error = %.3f%", 100 * (1 - running_hits / (iterations * y.size()[0])))
 
 
 def main():
