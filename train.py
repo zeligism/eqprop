@@ -23,6 +23,7 @@ def count_hits(net, y):
 
 
 def train(net, trainloader):
+    print("Training...")
     start_time = time.time()
     for epoch in range(EPOCHS):
         running_energy = running_cost = 0.0
@@ -56,6 +57,7 @@ def train(net, trainloader):
             
 
 def test(net, testloader):
+    print("Testing..")
     running_hits = iterations = 0
     for i, data in enumerate(testloader):
         x, y = data
@@ -75,8 +77,10 @@ def test(net, testloader):
         running_hits += hits
         iterations += 1
 
-    print("\nAverage hits =", running_hits / iterations)
-    print("Error = %.3f%", 100 * (1 - running_hits / (iterations * y.size()[0])))
+    print()
+    print("Average hits =", running_hits / iterations)
+    error = 1 - running_hits / (iterations * y.size()[0])
+    print("Error = %.3f%%" % (error * 100))
 
 
 def main():

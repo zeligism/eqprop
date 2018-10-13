@@ -131,9 +131,7 @@ class EqPropNet:
 
         free_energy = self.energy(free_states).mean()
         clamped_energy = self.energy(clamped_states).mean()
-        rand_sign = -1 if torch.randn(1) > 0 else 1
-        rand_sign = 1  #XXX
-        energy = rand_sign / self.beta * (clamped_energy - free_energy)
+        energy = 1 / self.beta * (clamped_energy - free_energy)
         energy.backward()
 
         # Update weights and biases (note the negative sign)
@@ -161,10 +159,10 @@ class EqPropNet:
         """
         Loads the weights and biases from a file called `fname`.
         """
-        with open(fname, "wb") as f:
+        with open(fname, "rb") as f:
             print("Loading parameters from '%s'... " % fname, end="")
             parameters = pickle.load(f)
-            self.W, self.biases = parameters  # XXX
+            self.W, self.biases = parameters
             print("Done.")
 
 
