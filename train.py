@@ -53,7 +53,7 @@ def train(net, trainloader):
             epoch+1, EPOCHS, energy.mean(), cost.mean(), count_hits(net, y), y.size()[0]))
 
     # Save model
-    net.save_parameters()
+    net.save_parameters(FNAME)
             
 
 def test(net, testloader):
@@ -87,11 +87,23 @@ def main():
     # Set random seed if given
     torch.manual_seed(RANDOM_SEED or torch.initial_seed())
 
-    # Dataset
+    # Define dataset
     trainloader, testloader = dataset(BATCH_SIZE)
 
-    # Network
-    eqprop_net = EqPropNet()
+    # Set model parameters
+    model_params = {
+        "batch_size": BATCH_SIZE,
+        "layers_sizes": LAYER_SIZES,
+        "learning_rates": LEARNING_RATES,
+        "n_iter_1": N_ITER_1,
+        "n_iter_2": N_ITER_2,
+        "rho": lambda x: x.clamp(0,1),  # Assuming x is a torch.Tensor
+        "beta": BETA,
+        "dt": DELTA,
+    }
+
+    # Define network
+    eqprop_net = EqPropNet(**model_params)
 
     # Train
     train(eqprop_net, trainloader)

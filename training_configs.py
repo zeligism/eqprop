@@ -8,23 +8,24 @@ RANDOM_SEED = 10
 BATCH_SIZE = 20
 CHECKPOINT = 20
 
-# EqProp specific hyperparameters
+# The name of the file in which the parameters are saved
 FNAME = "model.pickled"
-BETA = 1.0
-DELTA = 0.5  # called epsilon in the paper
-RHO = lambda x: x.clamp(0, 1)
 
-# Choose one of the configurations below
-CONFIGURATION = 1
+# First choose one of the configurations below
+MODEL_CONFIG = 1
 
-
+"""
+---------------------
+Define configurations.
+---------------------
+"""
 ### Configuration 1 ###
-if CONFIGURATION == 1:
-	BETA = 0.5
-	#EPOCHS = 25
-	EPOCHS = 15
+if MODEL_CONFIG == 1:
+	EPOCHS = 25
 	N_ITER_1 = 20
 	N_ITER_2 = 4
+	BETA = 0.5
+	DELTA = 0.5
 	LAYER_SIZES = [
 		28 * 28,
 		500,
@@ -35,12 +36,13 @@ if CONFIGURATION == 1:
 		0.05,
 	]
 
-
 ### Configuration 2 ###
-if CONFIGURATION == 2:
+elif MODEL_CONFIG == 2:
 	EPOCHS = 60
 	N_ITER_1 = 100
 	N_ITER_2 = 6
+	BETA = 1.0
+	DELTA = 0.5
 	LAYER_SIZES = [
 		28 * 28,
 		500,
@@ -55,10 +57,12 @@ if CONFIGURATION == 2:
 
 
 ### Configuration 3 ###
-if CONFIGURATION == 3:
+elif MODEL_CONFIG == 3:
 	EPOCHS = 160
 	N_ITER_1 = 500
 	N_ITER_2 = 8
+	BETA = 1.0
+	DELTA = 0.5
 	LAYER_SIZES = [
 		28 * 28,
 		500,
@@ -72,6 +76,8 @@ if CONFIGURATION == 3:
 		0.002,
 	]
 
-
-
+else:
+	print("Error: invalid configuration:", MODEL_CONFIG)
+	print("Please set MODEL_CONFIG to 1, 2, or 3 in training_config.py")
+	exit()
 
