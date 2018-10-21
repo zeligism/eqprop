@@ -40,7 +40,11 @@ class EqPropNet:
             energy += 0.5 * torch.sum(states[i] * states[i], dim=-1)
 
         for i in range(len(self.weights)):
-            # TODO: remove rho's !
+            """
+            XXX: we can remove the rho()'s for a slightly faster training,
+            as long as we always clamp(0,1) after updating states in self.step().
+            """
+            rho = lambda x: x  # do nothing
             # Sum of W_ij * rho(s_i) * rho(s_j) for all i, j
             energy -= torch.sum(
                 (rho(states[i]) @ self.weights[i]) * rho(states[i+1]), dim=-1)
@@ -97,7 +101,6 @@ class EqPropNet:
         for i in range(1, len(states)):
             # Notice the negative sign because ds/dt = -dE/ds (partial d)
             states[i] = states[i] - self.dt * states[i].grad
-            # XXX: fix energy() if you ever remove/change clamp(0,1).
             states[i].clamp_(0,1).detach_()
 
         return energy
