@@ -6,6 +6,7 @@ import torch
 from training_configs import *
 from dataset import dataset
 from eqprop_torch import EqPropNet
+from eqprop_torch_nograd import EqPropNet_NoGrad
 
 
 def index_to_onehot(index, num_indices):
@@ -57,7 +58,7 @@ def train(net, trainloader):
             
 
 def test(net, testloader):
-    print("Testing..")
+    print("Testing...")
     running_hits = iterations = 0
     for i, data in enumerate(testloader):
         x, y = data
@@ -103,7 +104,7 @@ def main():
     }
 
     # Define network
-    eqprop_net = EqPropNet(**model_params)
+    eqprop_net = EqPropNet_NoGrad(**model_params)
 
     # Train
     train(eqprop_net, trainloader)
