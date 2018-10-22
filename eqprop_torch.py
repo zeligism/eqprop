@@ -33,18 +33,16 @@ class EqPropNet:
         Calculates the energy of the network.
         """
         rho = self.rho
-        energy = 0
+        # XXX: we can remove the rho()'s for a slightly faster training,
+        # as long as we always clamp(0,1) after updating states in self.step().
+        rho = lambda x: x  # do nothing
 
+        energy = 0
         for i in range(len(states)):
             # Sum of s_i * s_i for all i
             energy += 0.5 * torch.sum(states[i] * states[i], dim=-1)
 
         for i in range(len(self.weights)):
-            """
-            XXX: we can remove the rho()'s for a slightly faster training,
-            as long as we always clamp(0,1) after updating states in self.step().
-            """
-            rho = lambda x: x  # do nothing
             # Sum of W_ij * rho(s_i) * rho(s_j) for all i, j
             energy -= torch.sum(
                 (rho(states[i]) @ self.weights[i]) * rho(states[i+1]), dim=-1)
@@ -99,36 +97,12 @@ class EqPropNet:
 
         # Update states
         for i in range(1, len(states)):
-            # Notice the negative sign because ds/dt = -dE/ds (partial d)
+            # Notice the negative sign because ds/dt = -dE/ds
             states[i] = states[i] - self.dt * states[i].grad
             states[i].clamp_(0,1).detach_()
 
         return energy
 
-
-    def eqprop(self, x, y, train=True):
-        """
-        Trains the network on one example (x,y) using equilibrium propagation.
-        """
-
-        # First clamp the input
-        self.clamp_input(x)
-
-        # Run free phase
-        for i in range(self.n_iter_1):
-            energy = self.step(self.states)
-
-        if train:
-            # Collect states and perturb them to the weakly clamped y
-            clamped_states = [torch.tensor(s) for s in self.states]
-            for i in range(self.n_iter_2):
-                energy = self.step(clamped_states, y)
-
-            # Update weights
-            self.update_weights(self.states, clamped_states)
-
-        return energy, self.cost(self.states, y)
-    
 
     def update_weights(self, free_states, clamped_states):
         """
@@ -151,6 +125,30 @@ class EqPropNet:
         for i in range(len(self.biases)):
             self.biases[i] = self.biases[i] - self.lr[i] * self.biases[i].grad
             self.biases[i].detach_()
+
+
+    def eqprop(self, x, y, train=True):
+        """
+        Trains the network on one example (x,y) using equilibrium propagation.
+        """
+
+        # First clamp the input
+        self.clamp_input(x)
+
+        # Run free phase
+        for i in range(self.n_iter_1):
+            self.step(self.states)
+
+        if train:
+            # Collect states and perturb them to the weakly clamped y
+            clamped_states = [torch.tensor(s) for s in self.states]
+            for i in range(self.n_iter_2):
+                self.step(clamped_states, y)
+
+            # Update weights
+            self.update_weights(self.states, clamped_states)
+
+        return self.energy(self.states), self.cost(self.states, y)
 
 
     def save_parameters(self, fname):
