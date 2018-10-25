@@ -5,8 +5,8 @@ import torch
 
 from training_configs import *
 from dataset import dataset
-from eqprop_torch import EqPropNet
-from eqprop_torch_nograd import EqPropNet_NoGrad
+from eqprop.eqprop import EqPropNet
+from eqprop.eqprop_nograd import EqPropNet_NoGrad
 
 
 def index_to_onehot(index, num_indices):
