@@ -1,6 +1,6 @@
 
 import torch
-from eqprop import EqPropNet
+from .eqprop import EqPropNet
 
 
 class EqPropNet_NoGrad(EqPropNet):
