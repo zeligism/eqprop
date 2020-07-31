@@ -36,6 +36,9 @@ def train(trainloader,
           report_interval=20,
           save_interval=1e6):
 
+    if num_epochs == 0:
+        return
+
     energies = []
     mean_energies = []
     losses = []
@@ -72,8 +75,7 @@ def train(trainloader,
                 last_save_time = time.time()
         
     # Save model after finishing training
-    if num_epochs > 0:
-        eqpropnet.save_parameters("model.pt")
+    eqpropnet.save_parameters("model.pt")
     
     save_plot("Energy", mean_energies)
     save_plot("Loss", mean_losses)
