@@ -19,18 +19,11 @@ class EqPropNet_NoGrad(EqPropNet):
         """
         Make one step of duration dt. TODO
         """
-        rho = self.rho
-        rho_grad = self.rho_grad
-
-        # See XXX in self.energy() in eqprop_torch.py
-        rho = lambda x: x
-        rho_grad = lambda x: 1
-
         # Update states
         for i in range(1, len(states)):
             # Calculate the gradient ds/dt = -dE/ds
-            states_grad = -states[i] + rho_grad(states[i]) * (
-                rho(states[i-1]) @ self.weights[i-1] + self.biases[i-1])
+            states_grad = -states[i] + self.rho_grad(states[i]) * (
+                self.rho(states[i-1]) @ self.weights[i-1] + self.biases[i-1])
             # Update and clamp
             states[i] += self.dt * states_grad
             states[i].clamp_(0,1)
@@ -45,9 +38,6 @@ class EqPropNet_NoGrad(EqPropNet):
         TODO
         """
         rho = self.rho
-
-        # See XXX in self.energy() in eqprop_torch.py
-        rho = lambda x: x
 
         for i in range(len(self.weights)):
             # Calculate weight gradient and update TODO: is there a faster way?

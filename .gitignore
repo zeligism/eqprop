@@ -108,3 +108,7 @@ data/
 
 # model
 *.pickled
+models/
+plots/
+.DS_Store
+

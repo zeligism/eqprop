@@ -1,19 +1,20 @@
 
+import os
 import pickle
 import torch
 
 
 class EqPropNet:
-    def __init__(self, batch_size, layers_sizes, learning_rates,
-        n_iter_1, n_iter_2, rho=lambda x: x.clamp(0,1), beta=1, dt=0.5):
+    def __init__(self, batch_size, layer_sizes, learning_rates,
+        free_iters, clamped_iters, rho=lambda x: x.clamp(0,1), beta=1, dt=0.5):
         """
         An equilibrium propagation network that works on PyTorch.
         """
 
         # Training-specific hyperparameters
         self.lr = learning_rates
-        self.n_iter_1 = n_iter_1
-        self.n_iter_2 = n_iter_2
+        self.free_iters = free_iters
+        self.clamped_iters = clamped_iters
         # Dynamics-specific hyperparameters
         self.rho = rho
         self.beta = beta
@@ -21,22 +22,17 @@ class EqPropNet:
 
         # Initialize weights using Glorot-Bengio initialization
         self.weights = [torch.randn(l1, l2) * torch.tensor(2 / (l1 + l2)).sqrt()
-            for l1, l2 in zip(layers_sizes[:-1], layers_sizes[1:])]
-        self.biases = [torch.zeros(l) for l in layers_sizes[1:]]
+            for l1, l2 in zip(layer_sizes[:-1], layer_sizes[1:])]
+        self.biases = [torch.zeros(l) for l in layer_sizes[1:]]
 
         # Initialize states to 0 (or I guess anything between 0 and 1 is ok)
-        self.states = [torch.zeros(batch_size, l) for l in layers_sizes]
+        self.states = [torch.zeros(batch_size, l) for l in layer_sizes]
 
     
     def energy(self, states):
         """
         Calculates the energy of the network.
         """
-        rho = self.rho
-        # XXX: we can remove the rho()'s for a slightly faster training,
-        # as long as we always clamp(0,1) after updating states in self.step().
-        rho = lambda x: x  # do nothing
-
         energy = 0
         for i in range(len(states)):
             # Sum of s_i * s_i for all i
@@ -45,9 +41,9 @@ class EqPropNet:
         for i in range(len(self.weights)):
             # Sum of W_ij * rho(s_i) * rho(s_j) for all i, j
             energy -= torch.sum(
-                (rho(states[i]) @ self.weights[i]) * rho(states[i+1]), dim=-1)
+                (self.rho(states[i]) @ self.weights[i]) * self.rho(states[i+1]), dim=-1)
             # Sum of bias_i * rho(s_i)
-            energy -= torch.sum(self.biases[i] * rho(states[i+1]), dim=-1)
+            energy -= torch.sum(self.biases[i] * self.rho(states[i+1]), dim=-1)
 
         return energy
 
@@ -136,13 +132,13 @@ class EqPropNet:
         self.clamp_input(x)
 
         # Run free phase
-        for i in range(self.n_iter_1):
+        for _ in range(self.free_iters):
             self.step(self.states)
 
         if train:
             # Collect states and perturb them to the weakly clamped y
-            clamped_states = [torch.tensor(s) for s in self.states]
-            for i in range(self.n_iter_2):
+            clamped_states = [s.clone().detach() for s in self.states]
+            for _ in range(self.clamped_iters):
                 self.step(clamped_states, y)
 
             # Update weights
@@ -151,11 +147,14 @@ class EqPropNet:
         return self.energy(self.states), self.cost(self.states, y)
 
 
-    def save_parameters(self, fname):
+    def save_parameters(self, fname, models_dir="models"):
         """
         Saves the weights and biases of the model to a file called `fname`.
         """
-        with open(fname, "wb") as f:
+        if not os.path.exists(models_dir):
+            os.mkdir(models_dir)
+
+        with open(os.path.join(models_dir, fname), "wb") as f:
             print("Saving parameters to '%s'... " % fname, end="")
             parameters = (self.weights, self.biases)
             pickle.dump(parameters, f)
