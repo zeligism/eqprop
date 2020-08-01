@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from dataset import MNISTDataset
 from eqprop.eqprop import EqPropNet
 from eqprop.eqprop_nograd import EqPropNet_NoGrad
+from eqprop.eqprop_graph import EqPropGraph, create_ffnn_graph
 
 
 def index_to_onehot(index, num_indices=10):
@@ -73,7 +74,7 @@ def train(trainloader,
             if (time.time() - last_save_time) > save_interval:
                 eqpropnet.save_parameters("model@epochs={},iters={}.pt".format(epoch, iters+1))
                 last_save_time = time.time()
-        
+
     # Save model after finishing training
     eqpropnet.save_parameters("model.pt")
     
@@ -123,9 +124,12 @@ def main(args):
     }
 
     # Define network
-    eqpropnet = EqPropNet(**model_params) if not args.no_grad else EqPropNet_NoGrad(**model_params)
-    if args.load_model:
-        eqpropnet.load_parameters(args.load_model)
+    if args.graph:
+        eqpropnet = EqPropGraph(*create_ffnn_graph(args.layer_sizes))
+    else:
+        eqpropnet = EqPropNet(**model_params) if not args.no_grad else EqPropNet_NoGrad(**model_params)
+        if args.load_model:
+            eqpropnet.load_parameters(args.load_model)
 
     # Train
     train(trainloader, eqpropnet,
@@ -162,6 +166,7 @@ if __name__ == '__main__':
         help="learning rates for each layer (must be equal to the number of layers minus 1).")
 
     parser.add_argument("--no-grad", action="store_true", help="trains without autograd.")
+    parser.add_argument("--graph", action="store_true", help="trains on a graph data structure (experimental).")
     parser.add_argument("--load-model", type=str, default=None,
         help="path of model to be loaded.")
 

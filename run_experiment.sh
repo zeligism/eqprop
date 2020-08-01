@@ -37,6 +37,9 @@ elif [ "$EXPERIMENT_ID" == "nograd" ]; then
 elif [ "$EXPERIMENT_ID" == "load-and-test" ]; then
 	python train.py -n 0 --load-model "models/model@epochs=2,iters=1971.pt"
 
+elif [ "$EXPERIMENT_ID" == "graph" ]; then
+	python train.py --graph --report-interval 1
+
 else
 	echo "Unrecognized argument: $EXPERIMENT_ID"
 	echo "Running default training routine."
