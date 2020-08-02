@@ -6,17 +6,18 @@ import torch
 
 class EqPropNet:
     def __init__(self, batch_size, layer_sizes, learning_rates,
-        free_iters, clamped_iters, rho=lambda x: x.clamp(0,1), beta=1, dt=0.5):
+        free_iters, clamped_iters, beta=1, dt=0.5):
         """
         An equilibrium propagation network that works on PyTorch.
         """
 
         # Training-specific hyperparameters
+        self.batch_size = batch_size
+        self.layer_sizes = layer_sizes
         self.lr = learning_rates
         self.free_iters = free_iters
         self.clamped_iters = clamped_iters
         # Dynamics-specific hyperparameters
-        self.rho = rho
         self.beta = beta
         self.dt = dt
 
@@ -28,6 +29,8 @@ class EqPropNet:
         # Initialize states to 0 (or I guess anything between 0 and 1 is ok)
         self.states = [torch.zeros(batch_size, l) for l in layer_sizes]
 
+    def rho(self, x):
+        return torch.clamp(x,0,1)
     
     def energy(self, states):
         """
@@ -40,8 +43,7 @@ class EqPropNet:
 
         for i in range(len(self.weights)):
             # Sum of W_ij * rho(s_i) * rho(s_j) for all i, j
-            energy -= torch.sum(
-                (self.rho(states[i]) @ self.weights[i]) * self.rho(states[i+1]), dim=-1)
+            energy -= torch.sum((self.rho(states[i]) @ self.weights[i]) * self.rho(states[i+1]), dim=-1)
             # Sum of bias_i * rho(s_i)
             energy -= torch.sum(self.biases[i] * self.rho(states[i+1]), dim=-1)
 
@@ -78,7 +80,7 @@ class EqPropNet:
 
     def step(self, states, y=None):
         """
-        Make one step of duration dt. TODO
+        Make one step of duration dt.
         """
 
         [s.requires_grad_() for s in states[1:]]
@@ -89,7 +91,7 @@ class EqPropNet:
             energy += self.beta * self.cost(states, y)
 
         # Calculate the gradients
-        energy.sum().backward()
+        energy.mean().backward()
 
         # Update states
         for i in range(1, len(states)):
@@ -97,21 +99,21 @@ class EqPropNet:
             states[i] = states[i] - self.dt * states[i].grad
             states[i].clamp_(0,1).detach_()
 
-        return energy
+        return states
 
 
     def update_weights(self, free_states, clamped_states):
         """
-        TODO: doc
+        Updates weights along its gradient descent.
         """
 
         [w.requires_grad_() for w in self.weights]
         [b.requires_grad_() for b in self.biases]
 
-        free_energy = self.energy(free_states).mean()
-        clamped_energy = self.energy(clamped_states).mean()
+        free_energy = self.energy(free_states)
+        clamped_energy = self.energy(clamped_states)
         energy = 1 / self.beta * (clamped_energy - free_energy)
-        energy.backward()
+        energy.mean().backward()
 
         # Update weights and biases (note the negative sign)
         for i in range(len(self.weights)):
@@ -144,7 +146,8 @@ class EqPropNet:
             # Update weights
             self.update_weights(self.states, clamped_states)
 
-        return self.energy(self.states), self.cost(self.states, y)
+        with torch.no_grad():
+            return self.energy(self.states), self.cost(self.states, y)
 
 
     def save_parameters(self, fname, models_dir="models"):

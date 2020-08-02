@@ -14,10 +14,13 @@ class EqPropNet_NoGrad(EqPropNet):
         # Define the derivative of rho
         self.rho_grad = lambda x: ((0 <= x) * (x <= 1)).type(torch.FloatTensor)
 
+    def eqprop(self, *args, **kwargs):
+        with torch.no_grad():
+            return super().eqprop(*args, **kwargs)
 
     def step(self, states, y=None):
         """
-        Make one step of duration dt. TODO
+        Make one step of duration dt.
         """
         # Update states
         for i in range(1, len(states)):
@@ -31,11 +34,13 @@ class EqPropNet_NoGrad(EqPropNet):
         # Update last layer in weakly clamped phase
         if y is not None:
             states[-1] += self.dt * self.beta * (y - states[-1])
+
+        return states
     
 
     def update_weights(self, free_states, clamped_states):
         """
-        TODO
+        Updates weights based on eqprop dynamics.
         """
         rho = self.rho
 
@@ -52,6 +57,5 @@ class EqPropNet_NoGrad(EqPropNet):
             # Calculate weight gradient and update
             biases_grad = rho(clamped_states[i+1]) - rho(free_states[i+1])
             self.biases[i] += self.lr[i] / self.beta * biases_grad.mean(dim=0)
-
 
 

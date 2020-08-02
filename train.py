@@ -9,6 +9,7 @@ from dataset import MNISTDataset
 from eqprop.eqprop import EqPropNet
 from eqprop.eqprop_nograd import EqPropNet_NoGrad
 from eqprop.eqprop_graph import EqPropGraph, create_ffnn_graph
+from eqprop.eqprop_spiking import EqPropSpikingNet, EqPropSpikingNet_NoGrad
 
 
 def index_to_onehot(index, num_indices=10):
@@ -48,38 +49,38 @@ def train(trainloader,
     last_save_time = start_time
 
     print("Training...")
-    for epoch in range(num_epochs):
-        for iters, data in enumerate(trainloader):
-            x, y = data
-            output_size = eqpropnet.output_state().size(-1)
-            y = index_to_onehot(y, output_size)
+    try:
+        for epoch in range(num_epochs):
+            for iters, data in enumerate(trainloader):
+                x, y = data
+                output_size = eqpropnet.output_state().size(-1)
+                y = index_to_onehot(y, output_size)
 
-            # Train on (x,y) using equilibrium propagation
-            energy, loss = eqpropnet.eqprop(x, y)
-            energies.append(energy.mean().item())
-            losses.append(loss.mean().item())
+                # Train on (x,y) using equilibrium propagation
+                energy, loss = eqpropnet.eqprop(x, y)
+                energies.append(energy.mean().item())
+                losses.append(loss.mean().item())
 
-            # Prepare stuff for report
-            if (iters + 1) % report_interval == 0:
-                mean_energies.append(sum(energies)/len(energies))
-                mean_losses.append(sum(losses)/len(losses))
-                print("[%d, %d] energy = %.3f, loss = %.3f, hits = %d/%d" % (
-                    epoch + 1, iters + 1, mean_energies[-1], mean_losses[-1],
-                    count_hits(eqpropnet, y), y.size(0)))
-                print("Time elapsed = %ds" % (time.time() - start_time))
-                energies = []
-                losses = []
+                # Prepare stuff for report
+                if (iters + 1) % report_interval == 0:
+                    mean_energies.append(sum(energies)/len(energies))
+                    mean_losses.append(sum(losses)/len(losses))
+                    print("[%d, %d] energy = %.3f, loss = %.3f, hits = %d/%d" % (
+                        epoch + 1, iters + 1, mean_energies[-1], mean_losses[-1],
+                        count_hits(eqpropnet, y), y.size(0)))
+                    print("Time elapsed = %ds" % (time.time() - start_time))
+                    energies = []
+                    losses = []
 
-            # Save model
-            if (time.time() - last_save_time) > save_interval:
-                eqpropnet.save_parameters("model@epochs={},iters={}.pt".format(epoch, iters+1))
-                last_save_time = time.time()
-
-    # Save model after finishing training
-    eqpropnet.save_parameters("model.pt")
-    
-    save_plot("Energy", mean_energies)
-    save_plot("Loss", mean_losses)
+                # Save model
+                if (time.time() - last_save_time) > save_interval:
+                    eqpropnet.save_parameters(f"model@epochs={epoch},iters={iters+1}.pt")
+                    last_save_time = time.time()
+    finally:
+        # Save model after finishing training
+        eqpropnet.save_parameters(f"model@epochs={epoch},iters={iters+1}.pt")
+        save_plot(f"Energy (iters={iters+1})", mean_energies)
+        save_plot(f"Loss (iters={iters+1})", mean_losses)
             
 
 def test(testloader, eqpropnet, report_interval):
@@ -126,10 +127,13 @@ def main(args):
     # Define network
     if args.graph:
         eqpropnet = EqPropGraph(*create_ffnn_graph(args.layer_sizes))
+    elif args.spiking:
+        eqpropnet = EqPropSpikingNet(**model_params) if not args.no_grad else EqPropSpikingNet_NoGrad(**model_params)
     else:
         eqpropnet = EqPropNet(**model_params) if not args.no_grad else EqPropNet_NoGrad(**model_params)
-        if args.load_model:
-            eqpropnet.load_parameters(args.load_model)
+    
+    if args.load_model and not args.graph:
+        eqpropnet.load_parameters(args.load_model)
 
     # Train
     train(trainloader, eqpropnet,
@@ -167,8 +171,9 @@ if __name__ == '__main__':
 
     parser.add_argument("--no-grad", action="store_true", help="trains without autograd.")
     parser.add_argument("--graph", action="store_true", help="trains on a graph data structure (experimental).")
-    parser.add_argument("--load-model", type=str, default=None,
-        help="path of model to be loaded.")
+    parser.add_argument("--spiking", action="store_true", help="trains spiking neurons with eqprop (experimental).")
+    
+    parser.add_argument("--load-model", type=str, default=None, help="path of model to be loaded.")
 
     args = parser.parse_args()
     main(args)

@@ -40,6 +40,9 @@ elif [ "$EXPERIMENT_ID" == "load-and-test" ]; then
 elif [ "$EXPERIMENT_ID" == "graph" ]; then
 	python train.py --graph --report-interval 1
 
+elif [ "$EXPERIMENT_ID" == "spiking" ]; then
+	python train.py --spiking
+
 else
 	echo "Unrecognized argument: $EXPERIMENT_ID"
 	echo "Running default training routine."
