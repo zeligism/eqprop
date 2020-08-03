@@ -2,6 +2,7 @@
 import os
 import pickle
 import torch
+from math import sqrt
 
 
 class EqPropNet:
@@ -21,33 +22,38 @@ class EqPropNet:
         self.beta = beta
         self.dt = dt
 
-        # Initialize weights using Glorot-Bengio initialization
-        self.weights = [torch.randn(l1, l2) * torch.tensor(2 / (l1 + l2)).sqrt()
-            for l1, l2 in zip(layer_sizes[:-1], layer_sizes[1:])]
-        self.biases = [torch.zeros(l) for l in layer_sizes[1:]]
-
         # Initialize states to 0 (or I guess anything between 0 and 1 is ok)
         self.states = [torch.zeros(batch_size, l) for l in layer_sizes]
+        # Initialize weights using Glorot-Bengio initialization
+        self.weights = [torch.randn(l1, l2) * sqrt(2. / (l1 + l2))
+            for l1, l2 in zip(layer_sizes[:-1], layer_sizes[1:])]
+        self.biases = [torch.zeros(l) for l in layer_sizes]
 
     def rho(self, x):
         return torch.clamp(x,0,1)
-    
-    def energy(self, states):
+
+    def energy(self, states=None):
         """
         Calculates the energy of the network.
         """
-        energy = 0
-        for i in range(len(states)):
-            # Sum of s_i * s_i for all i
-            energy += 0.5 * torch.sum(states[i] * states[i], dim=-1)
+        if states is None:
+            states = self.states
 
-        for i in range(len(self.weights)):
-            # Sum of W_ij * rho(s_i) * rho(s_j) for all i, j
-            energy -= torch.sum((self.rho(states[i]) @ self.weights[i]) * self.rho(states[i+1]), dim=-1)
-            # Sum of bias_i * rho(s_i)
-            energy -= torch.sum(self.biases[i] * self.rho(states[i+1]), dim=-1)
+        # Sum of s_i * s_i for all i
+        states_energy = 0.5 * sum(torch.sum(s*s, dim=1) for s in states)
+        # Sum of W_ij * rho(s_i) * rho(s_j) for all i, j, i != j
+        weights_energy = sum(
+            # ((B, s_i) @ (s_i, s_j)) * (B, s_j) = (B, s_j) * (B, s_j)
+            torch.sum(self.rho(s_i) @ W_ij * self.rho(s_j), dim=1)
+            for W_ij, s_i, s_j in zip(self.weights, states, states[1:])
+        )
+        # Sum of bias_i * rho(s_i)
+        biases_energy = sum(
+            torch.sum(b_i * self.rho(s_i), dim=1)
+            for b_i, s_i in zip(self.biases, states)
+        )
 
-        return energy
+        return states_energy - weights_energy - biases_energy
 
 
     def cost(self, states, y):
@@ -55,9 +61,8 @@ class EqPropNet:
         Calculates the cost between the state of the last layer of the network
         with the output y. The cost is just the distance (L2 loss).
         """
-        output_layer = self.output_state(states)
-        cost = torch.sum((output_layer - y) ** 2, dim=-1)
-        
+        cost = torch.sum((self.output_state(states) - y)**2, dim=-1)
+
         return cost
 
 
@@ -78,10 +83,12 @@ class EqPropNet:
         self.states[0] = x
 
 
-    def step(self, states, y=None):
+    def step(self, states=None, y=None):
         """
         Make one step of duration dt.
         """
+        if states is None:
+            states = self.states
 
         [s.requires_grad_() for s in states[1:]]
 
@@ -90,14 +97,13 @@ class EqPropNet:
         if y is not None:
             energy += self.beta * self.cost(states, y)
 
-        # Calculate the gradients
-        energy.mean().backward()
+        # Calculate the gradients (notice the negative sign because ds/dt = -dE/ds)
+        (-energy).sum().backward()
 
         # Update states
         for i in range(1, len(states)):
-            # Notice the negative sign because ds/dt = -dE/ds
-            states[i] = states[i] - self.dt * states[i].grad
-            states[i].clamp_(0,1).detach_()
+            states[i] = states[i] + self.dt * states[i].grad
+            states[i] = self.rho(states[i]).detach()
 
         return states
 
@@ -112,17 +118,15 @@ class EqPropNet:
 
         free_energy = self.energy(free_states)
         clamped_energy = self.energy(clamped_states)
-        energy = 1 / self.beta * (clamped_energy - free_energy)
-        energy.mean().backward()
+        energy = (clamped_energy - free_energy) / self.beta
+        (-energy).mean().backward()
 
-        # Update weights and biases (note the negative sign)
+        # Update weights and biases
         for i in range(len(self.weights)):
-            self.weights[i] = self.weights[i] - self.lr[i] * self.weights[i].grad
+            self.weights[i] = self.weights[i] + self.lr[i] * self.weights[i].grad
             self.weights[i].detach_()
-
-        for i in range(len(self.biases)):
-            self.biases[i] = self.biases[i] - self.lr[i] * self.biases[i].grad
-            self.biases[i].detach_()
+            self.biases[i+1] = self.biases[i+1] + self.lr[i] * self.biases[i+1].grad
+            self.biases[i+1].detach_()
 
 
     def eqprop(self, x, y, train=True):
