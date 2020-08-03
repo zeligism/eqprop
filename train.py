@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from dataset import MNISTDataset
 from eqprop.eqprop import EqPropNet
 from eqprop.eqprop_nograd import EqPropNet_NoGrad
-from eqprop.eqprop_graph import EqPropGraph, create_ffnn_graph
+from eqprop.eqprop_graph import EqPropGraph, create_ffn_graph
 from eqprop.eqprop_spiking import EqPropSpikingNet, EqPropSpikingNet_NoGrad
 
 
@@ -17,9 +17,10 @@ def index_to_onehot(index, num_indices=10):
     onehot.scatter_(-1, index.unsqueeze(dim=-1), 1)
     return onehot
 
-def count_hits(net, true_y):
-    pred_y, _ = net.output_state().max(dim=-1, keepdim=True)
-    hits = (pred_y * true_y == 1).sum().item()
+def count_hits(pred_y, true_y):
+    _, pred_indices = pred_y.max(dim=-1)
+    _, true_indices = true_y.max(dim=-1)
+    hits = (pred_indices == true_indices).sum().item()
     return hits
 
 def save_plot(title, y, plots_dir="plots"):
@@ -58,6 +59,7 @@ def train(trainloader,
 
                 # Train on (x,y) using equilibrium propagation
                 energy, loss = eqpropnet.eqprop(x, y)
+                pred_y = eqpropnet.output_state()
                 energies.append(energy.mean().item())
                 losses.append(loss.mean().item())
 
@@ -67,7 +69,7 @@ def train(trainloader,
                     mean_losses.append(sum(losses)/len(losses))
                     print("[%d, %d] energy = %.3f, loss = %.3f, hits = %d/%d" % (
                         epoch + 1, iters + 1, mean_energies[-1], mean_losses[-1],
-                        count_hits(eqpropnet, y), y.size(0)))
+                        count_hits(pred_y, y), y.size(0)))
                     print("Time elapsed = %ds" % (time.time() - start_time))
                     energies = []
                     losses = []
@@ -93,7 +95,8 @@ def test(testloader, eqpropnet, report_interval):
 
         # Train on (x,y) using equilibrium propagation
         energy, cost = eqpropnet.eqprop(x, y, train=False)
-        hits = count_hits(eqpropnet, y)
+        pred_y = eqpropnet.output_state()
+        hits = count_hits(pred_y, y)
         total_hits += hits
 
         if (iters + 1) % report_interval == 0:
@@ -126,7 +129,7 @@ def main(args):
 
     # Define network
     if args.graph:
-        eqpropnet = EqPropGraph(*create_ffnn_graph(args.layer_sizes))
+        eqpropnet = EqPropGraph(*create_ffn_graph(args.layer_sizes))
     elif args.spiking:
         eqpropnet = EqPropSpikingNet(**model_params) if not args.no_grad else EqPropSpikingNet_NoGrad(**model_params)
     else:
