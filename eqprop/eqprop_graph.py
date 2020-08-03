@@ -2,9 +2,9 @@
 import torch
 
 
-def create_ffnn_graph(layer_sizes):
+def create_ffn_graph(layer_sizes):
     """
-    Create a feed forward neural net graph.
+    Create a feed forward network graph.
     """
     # Initialize nodes and edges
     edges = []
