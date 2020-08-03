@@ -32,12 +32,10 @@ class EqPropNet:
     def rho(self, x):
         return torch.clamp(x,0,1)
 
-    def energy(self, states=None):
+    def energy(self, states):
         """
         Calculates the energy of the network.
         """
-        if states is None:
-            states = self.states
 
         # Sum of s_i * s_i for all i
         states_energy = 0.5 * sum(torch.sum(s*s, dim=1) for s in states)
@@ -83,12 +81,10 @@ class EqPropNet:
         self.states[0] = x
 
 
-    def step(self, states=None, y=None):
+    def step(self, states, y=None):
         """
         Make one step of duration dt.
         """
-        if states is None:
-            states = self.states
 
         [s.requires_grad_() for s in states[1:]]
 
