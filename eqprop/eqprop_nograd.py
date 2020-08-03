@@ -11,8 +11,11 @@ class EqPropNet_NoGrad(EqPropNet):
         """
         super().__init__(*args, **kwargs)
 
-        # Define the derivative of rho
-        self.rho_grad = lambda x: ((0 <= x) * (x <= 1)).type(torch.FloatTensor)
+    def rho_grad(self, x):
+        """
+        Define the derivative of rho.
+        """
+        return ((0 <= x) * (x <= 1)).to(x)
 
     def eqprop(self, *args, **kwargs):
         with torch.no_grad():
