@@ -37,12 +37,12 @@ class EqPropNet_NoGrad(EqPropNet):
             states_grad = norm_grad + self.rho_grad(states[i]) * (forward_grad + backward_grad + bias_grad)
 
             # Update and clamp
-            states[i] = self.rho(states[i] + self.dt * states_grad)
+            states[i] = (states[i] + self.dt * states_grad).clamp(0,1)
 
         # Update last layer in weakly clamped phase
         if y is not None:
             output_state_grad = self.beta * (y - self.output_state())
-            states[-1] = self.rho(states[-1] + self.dt * output_state_grad)
+            states[-1] = (states[-1] + self.dt * output_state_grad).clamp(0,1)
 
         return states
     

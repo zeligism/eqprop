@@ -99,7 +99,7 @@ class EqPropNet:
         # Update states
         for i in range(1, len(states)):
             states[i] = states[i] + self.dt * states[i].grad
-            states[i] = self.rho(states[i]).detach()
+            states[i] = states[i].clamp(0,1).detach()
 
         return states
 
