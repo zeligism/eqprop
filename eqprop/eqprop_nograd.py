@@ -24,16 +24,22 @@ class EqPropNet_NoGrad(EqPropNet):
         """
         # Update states
         for i in range(1, len(states)):
-            # Calculate the gradient ds/dt = -dE/ds
-            states_grad = -states[i] + self.rho_grad(states[i]) * (
-                self.rho(states[i-1]) @ self.weights[i-1] + self.biases[i-1])
+            # Calculate inner gradient terms
+            norm_grad = -states[i]
+            forward_grad = self.rho(states[i-1]) @ self.weights[i-1] if i > 0 else 0
+            backward_grad = self.rho(states[i+1]) @ self.weights[i].t() if i < len(states) - 1 else 0
+            bias_grad = self.biases[i]
+            
+            # Calculate the whole gradient ds/dt = -dE/ds
+            states_grad = norm_grad + self.rho_grad(states[i]) * (forward_grad + backward_grad + bias_grad)
+
             # Update and clamp
-            states[i] += self.dt * states_grad
-            states[i].clamp_(0,1)
+            states[i] = self.rho(states[i] + self.dt * states_grad)
 
         # Update last layer in weakly clamped phase
         if y is not None:
-            states[-1] += self.dt * self.beta * (y - states[-1])
+            output_state_grad = self.beta * (y - self.output_state())
+            states[-1] = self.rho(states[-1] + self.dt * output_state_grad)
 
         return states
     
@@ -42,20 +48,19 @@ class EqPropNet_NoGrad(EqPropNet):
         """
         Updates weights based on eqprop dynamics.
         """
-        rho = self.rho
 
         for i in range(len(self.weights)):
             # Calculate weight gradient and update TODO: is there a faster way?
             weights_grad = \
-                rho(clamped_states[i]).unsqueeze(dim=-1) \
-                @ rho(clamped_states[i+1]).unsqueeze(dim=-2) \
-                - rho(free_states[i]).unsqueeze(dim=-1) \
-                @ rho(free_states[i+1]).unsqueeze(dim=-2)
+                self.rho(clamped_states[i]).unsqueeze(dim=2) \
+                @ self.rho(clamped_states[i+1]).unsqueeze(dim=1) \
+                - self.rho(free_states[i]).unsqueeze(dim=2) \
+                @ self.rho(free_states[i+1]).unsqueeze(dim=1)
             self.weights[i] += self.lr[i] / self.beta * weights_grad.mean(dim=0)
 
-        for i in range(len(self.biases)):
+        for i in range(1, len(self.biases)):
             # Calculate weight gradient and update
-            biases_grad = rho(clamped_states[i+1]) - rho(free_states[i+1])
-            self.biases[i] += self.lr[i] / self.beta * biases_grad.mean(dim=0)
+            biases_grad = self.rho(clamped_states[i]) - self.rho(free_states[i])
+            self.biases[i] += self.lr[i-1] / self.beta * biases_grad.mean(dim=0)
 
 
