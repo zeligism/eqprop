@@ -46,10 +46,10 @@ elif [ "$RUN_TYPE" == "spiking" ]; then
 elif [ "$RUN_TYPE" == "spiking-nograd" ]; then
 	python train.py --spiking --no-grad
 
-elif [ "$RUN_TYPE" == "continual-weight-updates" ]; then
+elif [ "$RUN_TYPE" == "continual" ]; then
 	python train.py --continual --clamped-iters 5 --learning-rates 0.02 0.01
 
-elif [ "$RUN_TYPE" == "continual-weight-updates-nograd" ]; then
+elif [ "$RUN_TYPE" == "continual-nograd" ]; then
 	python train.py --continual --clamped-iters 5 --learning-rates 0.02 0.01 --no-grad
 
 else
