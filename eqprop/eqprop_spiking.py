@@ -83,6 +83,13 @@ class PredictiveDecoder:
 
 
 class EqPropSpikingNet(EqPropNet):
+    """
+    This class implements EqProp training with spiking neural net.
+    Paper: http://proceedings.mlr.press/v89/o-connor19a.html
+    Code: https://github.com/QUVA-Lab/spiking-equilibrium-prop
+    (Warning: The code is some of the most convoluted code I've ever seen.)
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.encoder = PredictiveEncoder(self.states, quantizer=SigmaDeltaEncoder(self.states))

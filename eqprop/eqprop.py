@@ -6,6 +6,11 @@ from math import sqrt
 
 
 class EqPropNet:
+    """
+    This class implements Equilibrium Propagation.
+    Paper: https://arxiv.org/abs/1602.05179
+    Code: https://github.com/bscellier/Towards-a-Biologically-Plausible-Backprop
+    """
     def __init__(self, batch_size, layer_sizes, learning_rates,
         free_iters, clamped_iters, beta=1, dt=0.5):
         """

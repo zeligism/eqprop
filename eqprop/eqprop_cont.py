@@ -7,7 +7,9 @@ from .eqprop import EqPropNet, EqPropNet_NoGrad
 class ContEqPropNet(EqPropNet):
     """
     This class implements C-EqProp, aka EqProp with continual weight updates.
-    arxiv link: https://arxiv.org/abs/2005.04168.pdf.
+    Paper: https://arxiv.org/abs/2005.04168.pdf
+    Code: https://drive.google.com/open?id=1oZtzBTu8zZgvAopyK2sQg2bpcsrzwTrp
+    (Author: "HEY GUYS I HAVE A GREAT IDEA LET'S SHARE OUR CODE THROUGH GOOGLE DRIVE.")
     """
 
     def eqprop(self, x, y, train=True):
