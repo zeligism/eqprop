@@ -6,10 +6,10 @@ import torch
 import matplotlib.pyplot as plt
 
 from dataset import MNISTDataset
-from eqprop.eqprop import EqPropNet
-from eqprop.eqprop_nograd import EqPropNet_NoGrad
+from eqprop.eqprop import EqPropNet, EqPropNet_NoGrad
 from eqprop.eqprop_graph import EqPropGraph, create_ffn_graph
 from eqprop.eqprop_spiking import EqPropSpikingNet, EqPropSpikingNet_NoGrad
+from eqprop.eqprop_cont import ContEqPropNet, ContEqPropNet_NoGrad
 
 
 def index_to_onehot(index, num_indices=10):
@@ -132,6 +132,8 @@ def main(args):
         eqpropnet = EqPropGraph(*create_ffn_graph(args.layer_sizes))
     elif args.spiking:
         eqpropnet = EqPropSpikingNet(**model_params) if not args.no_grad else EqPropSpikingNet_NoGrad(**model_params)
+    elif args.continual:
+        eqpropnet = ContEqPropNet(**model_params) if not args.no_grad else ContEqPropNet_NoGrad(**model_params)
     else:
         eqpropnet = EqPropNet(**model_params) if not args.no_grad else EqPropNet_NoGrad(**model_params)
     
@@ -174,7 +176,8 @@ if __name__ == '__main__':
 
     parser.add_argument("--no-grad", action="store_true", help="trains without autograd.")
     parser.add_argument("--graph", action="store_true", help="trains on a graph data structure (experimental).")
-    parser.add_argument("--spiking", action="store_true", help="trains spiking neurons with eqprop (experimental).")
+    parser.add_argument("--spiking", action="store_true", help="trains spiking neurons with eqprop.")
+    parser.add_argument("--continual", action="store_true", help="trains eqprop with continual weight updates.")
     
     parser.add_argument("--load-model", type=str, default=None, help="path of model to be loaded.")
 
