@@ -156,11 +156,13 @@ class EqPropSpikingNet_NoGrad(EqPropSpikingNet, EqPropNet_NoGrad):
         # Encode/quantize states
         encoded_states = self.encoder([self.rho(s) for s in states], self.lmbda)
 
-        # Decode foreward and backward spikes or synapses or sorry-I-don't-know-much-neurosciences
+        # Decode foreward and backward spikes
         fore_spikes = self.fore_decoder(
-            [s_i @ W_ij for s_i, W_ij in zip(encoded_states, self.weights)], self.lmbda)
+            [s_i @ W_ij for s_i, W_ij in zip(encoded_states, self.weights)],
+            self.lmbda)
         back_spikes = self.back_decoder(
-            [s_j @ W_ij.t() for s_j, W_ij in zip(encoded_states[1:], self.weights)], self.lmbda)
+            [s_j @ W_ij.t() for s_j, W_ij in zip(encoded_states[1:], self.weights)],
+            self.lmbda)
 
         # Update states
         for i in range(1, len(states)):
