@@ -1,8 +1,7 @@
 
 import torch
 
-from .eqprop import EqPropNet
-from .eqprop_nograd import EqPropNet_NoGrad
+from .eqprop import EqPropNet, EqPropNet_NoGrad
 
 
 class StochasticEncoder:
@@ -140,7 +139,7 @@ class EqPropSpikingNet(EqPropNet):
 
 class EqPropSpikingNet_NoGrad(EqPropSpikingNet, EqPropNet_NoGrad):
     """
-    energy() from EqPropSpikingNet. XXX: not correct.
+    EqPropSpikingNet without using autograd.
     """
 
     def eqprop(self, *args, **kwargs):
