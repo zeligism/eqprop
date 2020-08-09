@@ -6,10 +6,9 @@ import torch
 import matplotlib.pyplot as plt
 
 from dataset import MNISTDataset
-from eqprop.eqprop import EqPropNet, EqPropNet_NoGrad
+from eqprop.eqprop import EqPropNet, EqPropNet_NoGrad, ContEqPropNet, ContEqPropNet_NoGrad
 from eqprop.eqprop_graph import EqPropGraph, create_ffn_graph
 from eqprop.eqprop_spiking import EqPropSpikingNet, EqPropSpikingNet_NoGrad
-from eqprop.eqprop_cont import ContEqPropNet, ContEqPropNet_NoGrad
 
 
 def index_to_onehot(index, num_indices=10):
