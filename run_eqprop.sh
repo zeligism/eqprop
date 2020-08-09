@@ -53,7 +53,7 @@ elif [ "$RUN_TYPE" == "continual-nograd" ]; then
 	python train.py --continual --clamped-iters 5 --learning-rates 0.02 0.01 --no-grad
 
 else
-	echo "Unrecognized argument: $EXPERIMENT_ID"
+	echo "Unrecognized argument: $RUN_TYPE"
 	echo "Running default training routine."
 	python train.py
 fi
